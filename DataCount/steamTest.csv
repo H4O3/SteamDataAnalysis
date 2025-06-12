@@ -1,0 +1,5 @@
+appid,name,release_date,english,developer,publisher,platforms,required_age,categories,genres,steamspy_tags,achievements,positive_ratings,negative_ratings,average_playtime,median_playtime,owners,price
+10,Counter-Strike,2000-11-01,1,Valve,Valve,windows;mac;linux,0,Multi-player;Online Multi-Player;Local Multi-Player;Valve Anti-Cheat enabled,Action,Action;FPS;Multiplayer,0,124534,3339,17612,317,10000000-20000000,7.19
+20,Team Fortress Classic,1999-04-01,1,Valve,Valve,windows;mac;linux,0,Multi-player;Online Multi-Player;Local Multi-Player;Valve Anti-Cheat enabled,Action,Action;FPS;Multiplayer,0,3318,633,277,62,5000000-10000000,3.99
+30,Day of Defeat,2003-05-01,1,Valve,Valve,windows;mac;linux,0,Multi-player;Valve Anti-Cheat enabled,Action,FPS;World War II;Multiplayer,0,3416,398,187,34,5000000-10000000,3.99
+40,Deathmatch Classic,2001-06-01,1,Valve,Valve,windows;mac;linux,0,Multi-player;Online Multi-Player;Local Multi-Player;Valve Anti-Cheat enabled,Action,Action;FPS;Multiplayer,0,1273,267,258,184,5000000-10000000,3.99
