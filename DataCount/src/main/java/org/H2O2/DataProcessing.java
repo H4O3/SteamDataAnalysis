@@ -1,8 +1,6 @@
-package org.H2O2;// E:\JavaProject\SteamDataAnalysis\DataCount\src\main\java\org\H2O2\DataProcessing.java
+package org.H2O2;
 
-import org.apache.spark.ml.feature.PCA;
-import org.apache.spark.ml.feature.StandardScaler;
-import org.apache.spark.ml.feature.VectorAssembler;
+import org.apache.spark.ml.feature.*;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -11,52 +9,44 @@ import static org.apache.spark.sql.functions.*;
 
 public class DataProcessing {
     public static void main(String[] args) {
-        // 初始化 Spark 会话
-        // 创建 SparkSession 实例并设置应用程序名称、运行模式等
+        // 1. 初始化Spark会话
         SparkSession spark = SparkSession.builder()
-                .appName("Audience Preference Model") // 设置应用名称
-                .master("local[*]") // 在本地运行，并利用所有核心
-                .getOrCreate(); // 创建或获取现有的 SparkSession
+                .appName("Audience Preference Model") // 应用名称
+                .master("local[*]")                  // 本地模式使用所有CPU核心
+                .getOrCreate();
 
-        // 读取 CSV 数据集
-        // 使用 SparkSession 读取 steam.csv 文件，自动推断 schema 和包含 header
+        // 2. 读取CSV数据源
         Dataset<Row> steamDF = spark.read()
-                .option("header", true) // CSV 文件有表头
+                .option("header", true)     // 首行为列名
                 .option("inferSchema", true) // 自动推断数据类型
-                .csv("steam.csv"); // 数据源路径
+                .csv("steam.csv");          // 数据文件路径
 
-        // 数据诊断
-        steamDF.describe().show();
+        // 3. 数据探索
+        steamDF.describe().show();  // 显示数值型列的统计摘要
         System.out.println("缺失值统计:");
         for (String column : steamDF.columns()) {
-            long nullCount = steamDF.filter(col(column).isNull()).count();
+            long nullCount = steamDF.filter(col(column).isNull()).count(); // 统计每列空值数量
             System.out.println(column + ": " + nullCount);
         }
 
-        // 数据清洗
-        // 1. 移除重复的行，确保数据的唯一性
-        // 2. 使用0填充缺失值，保证数据的完整性
-        // 3. 将相关列转换为整型，提高数据的一致性和可处理性
-        // 4. 过滤掉价格为空或非正数的记录，确保数据的有效性和准确性
+        // 4. 数据清洗
         Dataset<Row> cleanedDF = steamDF
-                .dropDuplicates()
-                .na().drop()
+                .dropDuplicates()  // 删除重复行
+                .na().drop()       // 删除包含空值的行
+                // 类型转换（确保后续计算使用正确类型）
                 .withColumn("positive_ratings", col("positive_ratings").cast("int"))
                 .withColumn("negative_ratings", col("negative_ratings").cast("int"))
                 .withColumn("average_playtime", col("average_playtime").cast("double"))
                 .withColumn("median_playtime", col("median_playtime").cast("double"))
-                .filter(col("price").isNotNull().and(col("price").gt(0)));
+                .withColumn("price", col("price").cast("double"))
+                .filter(col("price").isNotNull().and(col("price").gt(0))); // 过滤无效价格
 
-
-        // 数据变换 - 创建新特征
-        // 在cleanedDF数据集的基础上，进行数据转换以添加新的列
+        // 5. 特征工程
         Dataset<Row> transformedDF = cleanedDF
-                // 新增"total_ratings"列，表示正面评价数量加上负面评价数量的总评价数
-                .withColumn("total_ratings", col("positive_ratings").plus(col("negative_ratings")))
-                // 新增"rating_ratio"列，表示正面评价占总评价数的比例
-                .withColumn("rating_ratio", col("positive_ratings").divide(col("total_ratings")))
-                // 创建列 rating_category：
-                // 根据好评率将游戏分为六个等级：好评如潮、特别好评、多半好评、褒贬不一、多半差评、差评如潮
+                // 创建新特征
+                .withColumn("total_ratings", col("positive_ratings").plus(col("negative_ratings"))) // 总评价数
+                .withColumn("rating_ratio", col("positive_ratings").divide(col("total_ratings")))   // 好评率
+                // 基于好评率创建分类标签
                 .withColumn("rating_category",
                         when(col("rating_ratio").geq(0.95), lit("好评如潮"))
                                 .when(col("rating_ratio").geq(0.8).and(col("rating_ratio").lt(0.95)), lit("特别好评"))
@@ -64,19 +54,53 @@ public class DataProcessing {
                                 .when(col("rating_ratio").geq(0.4).and(col("rating_ratio").lt(0.7)), lit("褒贬不一"))
                                 .when(col("rating_ratio").geq(0.2).and(col("rating_ratio").lt(0.4)), lit("多半差评"))
                                 .otherwise(lit("差评如潮")))
-                // 创建列 label：
-                // 如果 negative_ratings 为 0，则 label 为 0；
-                // 如果 positive_ratings / negative_ratings > 10，则 label 为 1；
-                // 其他情况 label 为 0。
-                // 1表示受欢迎
+                // 创建二分类标签（用于机器学习）
                 .withColumn("label",
-                        when(col("negative_ratings").equalTo(0), 0)
-                                .when(col("positive_ratings").divide(col("negative_ratings")).gt(10), 1)
-                                .otherwise(0)
-                );
+                        when(col("negative_ratings").equalTo(0), 0)  // 无差评=0
+                                .when(col("positive_ratings").divide(col("negative_ratings")).gt(10), 1) // 好评差评比>10=1
+                                .otherwise(0));                      // 其他情况=0
 
+        // 6. 类别特征编码
+        // 6.1 将平台字符串转换为数字索引
+        StringIndexer indexer = new StringIndexer()
+                .setInputCol("platforms")        // 输入列
+                .setOutputCol("platformsIndex"); // 输出索引列
+        Dataset<Row> indexedDF = indexer.fit(transformedDF).transform(transformedDF);
 
+        // 6.2 对索引进行独热编码
+        OneHotEncoder encoder = new OneHotEncoder()
+                .setInputCols(new String[]{"platformsIndex"})
+                .setOutputCols(new String[]{"platformsVec"}); // 输出向量列
+        OneHotEncoderModel encoderModel = encoder.fit(indexedDF);
+        Dataset<Row> encodedDF = encoderModel.transform(indexedDF);
 
+        // 7. 数值特征处理
+        // 7.1 将平均游戏时长转换为向量（供标准化使用）
+        VectorAssembler playtimeVecAssembler = new VectorAssembler()
+                .setInputCols(new String[]{"average_playtime"})
+                .setOutputCol("average_playtime_vec");
+        Dataset<Row> vecDF = playtimeVecAssembler.transform(encodedDF);
+
+        // 7.2 标准化游戏时长特征（均值为0，标准差为1）
+        StandardScaler scaler = new StandardScaler()
+                .setInputCol("average_playtime_vec")
+                .setOutputCol("scaled_playtime")      // 标准化后输出列
+                .setWithStd(true);                    // 启用标准差缩放
+        Dataset<Row> scaledDF = scaler.fit(vecDF).transform(vecDF);
+
+        // 8. 合并所有特征向量
+        VectorAssembler assembler = new VectorAssembler()
+                .setInputCols(new String[]{
+                    "scaled_playtime",    // 标准化后的游戏时长
+                    "price",              // 价格
+                    "total_ratings",      // 总评价数
+                    "platformsVec"        // 编码后的平台向量
+                })
+                .setOutputCol("rawFeatures") // 最终特征向量
+                .setHandleInvalid("keep");   // 保留无效值
+        Dataset<Row> assembledDF = assembler.transform(scaledDF);
+
+        // 9. 释放资源
         spark.stop();
     }
 }
