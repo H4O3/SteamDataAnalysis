@@ -29,17 +29,54 @@ public class DataProcessing {
             System.out.println(column + ": " + nullCount);
         }
 
-        // 4. 数据清洗
+        // 4. 数据清洗（增强版）
         Dataset<Row> cleanedDF = steamDF
-                .dropDuplicates()  // 删除重复行
-                .na().drop()       // 删除包含空值的行
-                // 类型转换（确保后续计算使用正确类型）
-                .withColumn("positive_ratings", col("positive_ratings").cast("int"))
-                .withColumn("negative_ratings", col("negative_ratings").cast("int"))
-                .withColumn("average_playtime", col("average_playtime").cast("double"))
-                .withColumn("median_playtime", col("median_playtime").cast("double"))
-                .withColumn("price", col("price").cast("double"))
-                .filter(col("price").isNotNull().and(col("price").gt(0))); // 过滤无效价格
+                // 4.1 删除重复行（根据关键字段）
+                .dropDuplicates(new String[]{"appid", "name"})  // 根据游戏ID和名称去重
+
+                // 4.2 处理空值
+                .na().drop(new String[]{"appid", "name"})       // 关键字段空值直接删除
+                .na().fill(0, new String[]{"required_age"})     // 年龄要求空值填充0
+                .na().fill("Unknown", new String[]{"developer", "publisher"}) // 开发商/发行商空值填充
+
+                // 4.3 类型转换与验证
+                .withColumn("positive_ratings",
+                        when(col("positive_ratings").cast("int").isNotNull(), col("positive_ratings").cast("int"))
+                                .otherwise(0))  // 非法值设为0
+                .withColumn("negative_ratings",
+                        when(col("negative_ratings").cast("int").isNotNull(), col("negative_ratings").cast("int"))
+                                .otherwise(0))
+                .withColumn("price",
+                        when(col("price").cast("double").geq(0), col("price").cast("double")) // 价格非负
+                                .otherwise(0.0))
+
+                // 4.4 异常值处理
+                .withColumn("average_playtime",
+                        when(col("average_playtime").gt(100000), 100000) // 设置游戏时长上限
+                                .when(col("average_playtime").lt(0), 0)          // 负值修正为0
+                                .otherwise(col("average_playtime").cast("double")))
+
+                // 4.5 数据规范化
+                .withColumn("release_year", year(to_date(col("release_date"), "yyyy-MM-dd"))) // 提取发布年份
+                .filter(col("release_year").between(1990, 2023))  // 过滤无效年份
+
+                // 4.6 平台字段拆分
+                .withColumn("platforms",
+                        when(col("platforms").isNull(), "windows")    // 空值默认windows
+                                .otherwise(col("platforms")));
+
+        // 4.7 异常值统计
+        System.out.println("异常值处理统计:");
+        long negativePlaytime = cleanedDF.filter(col("average_playtime").lt(0)).count();
+        long excessivePlaytime = cleanedDF.filter(col("average_playtime").gt(100000)).count();
+        System.out.println("负游戏时长记录: " + negativePlaytime);
+        System.out.println("超长游戏时长记录: " + excessivePlaytime);
+
+        // 4.8 价格分布分析
+        cleanedDF.select(mean("price").alias("avg_price"),
+                min("price").alias("min_price"),
+                max("price").alias("max_price")).show();
+
 
         // 5. 特征工程
         Dataset<Row> transformedDF = cleanedDF
