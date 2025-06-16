@@ -23,7 +23,7 @@ public class GameCount {
         // 数据预处理：去除完全重复的数据记录
 
         // 配置MySQL数据库连接参数
-        String url = "jdbc:mysql://localhost:3306/atguigudb";
+        String url = "jdbc:mysql://localhost:3306/SteamData";
         Properties properties = new Properties();
         properties.put("user", "root");
         properties.put("password", "123456");
@@ -134,6 +134,90 @@ public class GameCount {
         Dataset<Row> achievementRatingRelation = df.select("name", "achievements", "positive_ratings", "negative_ratings");
         // 展示结果
         achievementRatingRelation.show();
+
+
+        // 在main方法开头添加基础路径变量
+        String outputPath = "output/"; // CSV文件输出目录
+
+        // 1. 保存游戏类型统计结果
+        genreCounts.coalesce(1) .write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv(outputPath + "genre_counts.csv");
+
+        // 2. 保存平台分布结果
+        platformCounts.coalesce(1) .write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv(outputPath + "platform_counts.csv");
+
+        // 3. 保存评价比例结果
+        ratingRatio.select("name", "positive_ratings", "negative_ratings", "ratio")
+                .coalesce(1) .write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv(outputPath + "rating_ratio.csv");
+
+        // 4. 保存价格区间分布结果
+        priceRangeCount.coalesce(1) .coalesce(1) .write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv(outputPath + "price_ranges.csv");
+
+        // 5. 保存开发商游戏数量结果
+        developerCounts.coalesce(1) .write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv(outputPath + "developer_counts.csv");
+
+        // 6. 保存拥有者与游玩时间关系结果
+        ownerPlaytimeRelation.coalesce(1) .write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv(outputPath + "owner_playtime.csv");
+
+        // 7. 保存评分效率结果
+        ratingEfficiency.select("name", "positive_ratings", "negative_ratings", "efficiency")
+                .coalesce(1) .write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv(outputPath + "rating_efficiency.csv");
+
+        // 8. 保存发行年份统计结果
+        releaseYearCount.coalesce(1) .write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv(outputPath + "release_years.csv");
+
+        // 9. 保存拥有者TOP10结果
+        topOwners.coalesce(1) .write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv(outputPath + "top_owners.csv");
+
+        // 10. 保存开发商平均价格结果
+        avgPricePerDeveloper.coalesce(1) .write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv(outputPath + "developer_avg_price.csv");
+
+        // 11. 保存支持英文的游戏结果
+        englishSupportedGames.coalesce(1) .write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv(outputPath + "english_games.csv");
+
+        // 12. 保存游戏类别平均价格结果
+        categoryAvgPrice.coalesce(1) .write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv(outputPath + "category_avg_price.csv");
+
+        // 13. 保存成就与评价关系结果
+        achievementRatingRelation.coalesce(1) .write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv(outputPath + "achievement_ratings.csv");
 
 
     }
