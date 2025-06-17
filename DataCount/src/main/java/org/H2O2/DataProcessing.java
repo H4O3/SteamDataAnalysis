@@ -1,9 +1,11 @@
 package org.H2O2;
 
 import org.apache.spark.ml.feature.*;
+import org.apache.spark.ml.linalg.Vector;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.types.DataTypes;
 
 import static org.apache.spark.sql.functions.*;
 
@@ -15,11 +17,17 @@ public class DataProcessing {
                 .master("local[*]")                  // 本地模式使用所有CPU核心
                 .getOrCreate();
 
-        // 2. 读取CSV数据源
+//        // 2. 读取CSV数据源
+//        Dataset<Row> steamDF = spark.read()
+//                .option("header", true)     // 首行为列名
+//                .option("inferSchema", true) // 自动推断数据类型
+//                .csv("steam.csv");          // 数据文件路径
+// 修改读取数据源部分
+        //2. 读取CSV数据源
         Dataset<Row> steamDF = spark.read()
-                .option("header", true)     // 首行为列名
-                .option("inferSchema", true) // 自动推断数据类型
-                .csv("steam.csv");          // 数据文件路径
+                .option("header", true)
+                .option("inferSchema", true)
+                .csv("hdfs://192.168.88.161:8020/test/input/steam.csv"); // HDFS路径
 
         // 3. 数据探索
         steamDF.describe().show();  // 显示数值型列的统计摘要
@@ -128,16 +136,19 @@ public class DataProcessing {
         // 8. 合并所有特征向量
         VectorAssembler assembler = new VectorAssembler()
                 .setInputCols(new String[]{
-                    "scaled_playtime",    // 标准化后的游戏时长
-                    "price",              // 价格
-                    "total_ratings",      // 总评价数
-                    "platformsVec"        // 编码后的平台向量
+                        "scaled_playtime",    // 标准化后的游戏时长
+                        "price",              // 价格
+                        "total_ratings",      // 总评价数
+                        "platformsVec"        // 编码后的平台向量
                 })
                 .setOutputCol("rawFeatures") // 最终特征向量
                 .setHandleInvalid("keep");   // 保留无效值
         Dataset<Row> assembledDF = assembler.transform(scaledDF);
 
-        // 9. 释放资源
+
+        // 9. 保存处理后的数据为CSV
+
+        //释放资源
         spark.stop();
     }
 }
