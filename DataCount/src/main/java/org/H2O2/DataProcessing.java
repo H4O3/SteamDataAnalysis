@@ -1,11 +1,13 @@
 package org.H2O2;
 
 import org.apache.spark.ml.feature.*;
-import org.apache.spark.ml.linalg.Vector;
+import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.DataTypes;
+
+import java.util.Arrays;
 
 import static org.apache.spark.sql.functions.*;
 
@@ -17,17 +19,17 @@ public class DataProcessing {
                 .master("local[*]")                  // 本地模式使用所有CPU核心
                 .getOrCreate();
 
-//        // 2. 读取CSV数据源
-//        Dataset<Row> steamDF = spark.read()
-//                .option("header", true)     // 首行为列名
-//                .option("inferSchema", true) // 自动推断数据类型
-//                .csv("steam.csv");          // 数据文件路径
-// 修改读取数据源部分
-        //2. 读取CSV数据源
+        // 2. 读取本地CSV数据源
         Dataset<Row> steamDF = spark.read()
-                .option("header", true)
-                .option("inferSchema", true)
-                .csv("hdfs://192.168.88.161:8020/test/input/steam.csv"); // HDFS路径
+                .option("header", true)     // 首行为列名
+                .option("inferSchema", true) // 自动推断数据类型
+                .csv("steam.csv");          // 数据文件路径
+
+//        //2. 读取HDFS数据源
+//        Dataset<Row> steamDF = spark.read()
+//                .option("header", true)
+//                .option("inferSchema", true)
+//                .csv("hdfs://192.168.88.161:8020/test/input/steam.csv"); // HDFS路径
 
         // 3. 数据探索
         steamDF.describe().show();  // 显示数值型列的统计摘要
@@ -147,8 +149,18 @@ public class DataProcessing {
 
 
         // 9. 保存处理后的数据为CSV
+        Column[] stringColumns = Arrays.stream(assembledDF.columns())
+                .map(colName -> col(colName).cast(DataTypes.StringType).as(colName))
+                .toArray(Column[]::new);
 
-        //释放资源
+        Dataset<Row> stringDF = assembledDF.select(stringColumns);
+
+        stringDF.coalesce(1).write()
+                .option("header", true)
+                .mode("overwrite")
+                .csv("output2/processed_steam_data_string");
+
+        // 释放资源
         spark.stop();
     }
 }

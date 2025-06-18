@@ -19,7 +19,11 @@ public class GameCount {
         // 初始化Spark环境配置（本地模式，使用所有可用核心）
         SparkSession spark = SparkSession.builder().master("local[*]").appName("RentTest").getOrCreate();
         Dataset<Row> df = spark.read().option("header", true).option("inferSchema", true).csv("steam.csv");
-
+//        //读取HDFS数据源
+//        Dataset<Row> steamDF = spark.read()
+//                .option("header", true)
+//                .option("inferSchema", true)
+//                .csv("hdfs://192.168.88.161:8020/test/input/steam.csv"); // HDFS路径
         // 数据预处理：去除完全重复的数据记录
 
         // 配置MySQL数据库连接参数

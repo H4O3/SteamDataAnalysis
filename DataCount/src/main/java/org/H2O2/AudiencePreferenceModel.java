@@ -28,6 +28,13 @@ public class AudiencePreferenceModel {
                 .option("inferSchema", true) // 自动推断数据类型
                 .csv("steam.csv"); // 数据源路径
 
+//        //读取HDFS数据源
+//        Dataset<Row> steamDF = spark.read()
+//                .option("header", true)
+//                .option("inferSchema", true)
+//                .csv("hdfs://192.168.88.161:8020/test/input/steam.csv"); // HDFS路径
+
+
         // 删除包含任何空值的行
         df = df.na().drop(); // 移除存在 null 值的行
 
