@@ -39,7 +39,7 @@ public class DataProcessing {
             System.out.println(column + ": " + nullCount);
         }
 
-        // 4. 数据清洗（增强版）
+        // 4. 数据清洗
         Dataset<Row> cleanedDF = steamDF
                 // 4.1 删除重复行（根据关键字段）
                 .dropDuplicates(new String[]{"appid", "name"})  // 根据游戏ID和名称去重
@@ -87,6 +87,12 @@ public class DataProcessing {
                 min("price").alias("min_price"),
                 max("price").alias("max_price")).show();
 
+        //效果检查
+        System.out.println("缺失值统计:");
+        for (String column : steamDF.columns()) {
+            long nullCount = steamDF.filter(col(column).isNull()).count(); // 统计每列空值数量
+            System.out.println(column + ": " + nullCount);
+        }
 
         // 5. 特征工程
         Dataset<Row> transformedDF = cleanedDF
@@ -125,7 +131,8 @@ public class DataProcessing {
         // 7.1 将平均游戏时长转换为向量（供标准化使用）
         VectorAssembler playtimeVecAssembler = new VectorAssembler()
                 .setInputCols(new String[]{"average_playtime"})
-                .setOutputCol("average_playtime_vec");
+                .setOutputCol("average_playtime_vec")
+                .setHandleInvalid("skip");
         Dataset<Row> vecDF = playtimeVecAssembler.transform(encodedDF);
 
         // 7.2 标准化游戏时长特征（均值为0，标准差为1）
